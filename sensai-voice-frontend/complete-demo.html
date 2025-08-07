@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Complete Voice System Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .demo-section {
+      margin: 20px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .demo-section h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    .highlight-demo {
+      padding: 15px;
+      margin: 10px 0;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .highlight-demo:hover {
+      background-color: #f0f0f0;
+    }
+    #status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    .status-active {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status-inactive {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    #transcript {
+      margin-top: 1em;
+      font-size: 1.2em;
+      color: #333;
+      min-height: 50px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #interim {
+      color: #666;
+      font-style: italic;
+    }
+    #error {
+      color: red;
+      display: none;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Complete Voice System Demo</h1>
+  <p>This demo showcases all voice system features: Speech Recognition, Text-to-Speech, UI Highlighting, Barge-in, and Confirmation Handling.</p>
+
+  <div id="status" class="status-inactive">Voice System: Inactive</div>
+
+  <div class="demo-section">
+    <h3>System Controls</h3>
+    <button id="startBtn">Start Voice System</button>
+    <button id="stopBtn" disabled>Stop Voice System</button>
+  </div>
+
+  <div class="demo-section">
+    <h3>Speech Recognition</h3>
+    <button id="listenBtn" disabled>Start Listening</button>
+    <button id="stopListenBtn" disabled>Stop Listening</button>
+    <div id="transcript">
+      <div>Your speech will appear here...</div>
+      <div id="interim"></div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h3>Text-to-Speech</h3>
+    <button id="speakBtn" disabled>Speak "Hello World"</button>
+    <button id="speakLongBtn" disabled>Speak Long Text</button>
+    <button id="stopSpeakBtn" disabled>Stop Speaking</button>
+  </div>
+
+  <div class="demo-section">
+    <h3>UI Highlighting</h3>
+    <button id="highlightBtn" disabled>Highlight This Section</button>
+    <button id="focusBtn" disabled>Focus This Section</button>
+    <button id="clearHighlightBtn" disabled>Clear Highlights</button>
+    <div class="highlight-demo" id="demoElement">
+      This element can be highlighted and focused
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h3>Barge-in Test</h3>
+    <button id="bargeInTestBtn" disabled>Start Speaking (Try saying "stop")</button>
+    <p>Say "stop", "pause", "wait", or "interrupt" to test barge-in functionality.</p>
+  </div>
+
+  <div class="demo-section">
+    <h3>Confirmation Test</h3>
+    <button id="confirmationBtn" disabled>Ask for Confirmation</button>
+    <div id="confirmationResult"></div>
+  </div>
+
+  <div id="error"></div>
+
+  <script type="module">
+    import { VoiceSystem } from './voice-system/index.js';
+    
+    const voiceSystem = new VoiceSystem();
+    const statusDiv = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const listenBtn = document.getElementById('listenBtn');
+    const stopListenBtn = document.getElementById('stopListenBtn');
+    const speakBtn = document.getElementById('speakBtn');
+    const speakLongBtn = document.getElementById('speakLongBtn');
+    const stopSpeakBtn = document.getElementById('stopSpeakBtn');
+    const highlightBtn = document.getElementById('highlightBtn');
+    const focusBtn = document.getElementById('focusBtn');
+    const clearHighlightBtn = document.getElementById('clearHighlightBtn');
+    const bargeInTestBtn = document.getElementById('bargeInTestBtn');
+    const confirmationBtn = document.getElementById('confirmationBtn');
+    const transcriptDiv = document.getElementById('transcript');
+    const interimDiv = document.getElementById('interim');
+    const errorDiv = document.getElementById('error');
+    const confirmationResult = document.getElementById('confirmationResult');
+
+    // System controls
+    startBtn.onclick = () => {
+      voiceSystem.start();
+      updateStatus(true);
+      enableButtons(true);
+    };
+
+    stopBtn.onclick = () => {
+      voiceSystem.stop();
+      updateStatus(false);
+      enableButtons(false);
+    };
+
+    // Speech recognition
+    listenBtn.onclick = () => {
+      voiceSystem.listenForInput((text) => {
+        transcriptDiv.innerHTML = `<div><strong>You said:</strong> ${text}</div>`;
+        interimDiv.textContent = '';
+      });
+      listenBtn.disabled = true;
+      stopListenBtn.disabled = false;
+    };
+
+    stopListenBtn.onclick = () => {
+      voiceSystem.voiceInput.stopListening();
+      listenBtn.disabled = false;
+      stopListenBtn.disabled = true;
+    };
+
+    // Text-to-speech
+    speakBtn.onclick = () => {
+      voiceSystem.speakAndHighlight("Hello World! This is a test of the voice system.");
+    };
+
+    speakLongBtn.onclick = () => {
+      voiceSystem.speakAndHighlight(
+        "This is a longer text to demonstrate the text-to-speech functionality. " +
+        "You can interrupt this speech by saying stop, pause, or wait."
+      );
+    };
+
+    stopSpeakBtn.onclick = () => {
+      voiceSystem.voiceOutput.stop();
+    };
+
+    // UI highlighting
+    highlightBtn.onclick = () => {
+      voiceSystem.uiHighlight.highlight('#demoElement', 'default');
+    };
+
+    focusBtn.onclick = () => {
+      voiceSystem.uiHighlight.focusElement('#demoElement');
+    };
+
+    clearHighlightBtn.onclick = () => {
+      voiceSystem.clearHighlights();
+    };
+
+    // Barge-in test
+    bargeInTestBtn.onclick = () => {
+      voiceSystem.speakAndHighlight(
+        "I'm speaking now. Try saying stop, pause, wait, or interrupt to test barge-in functionality. " +
+        "This speech will continue for a while to give you time to test the interruption."
+      );
+    };
+
+    // Confirmation test
+    confirmationBtn.onclick = () => {
+      voiceSystem.askForConfirmation(
+        "Do you want to proceed with the test? Please say yes or no.",
+        (response) => {
+          confirmationResult.innerHTML = `<strong>Confirmation received:</strong> ${response}`;
+        }
+      );
+    };
+
+    // Barge-in callback
+    voiceSystem.onBargeIn((keyword) => {
+      console.log(`Barge-in detected: ${keyword}`);
+      voiceSystem.speakAndHighlight(`You said ${keyword}. I've stopped speaking.`);
+    });
+
+    // Helper functions
+    function updateStatus(isActive) {
+      if (isActive) {
+        statusDiv.textContent = 'Voice System: Active';
+        statusDiv.className = 'status-active';
+      } else {
+        statusDiv.textContent = 'Voice System: Inactive';
+        statusDiv.className = 'status-inactive';
+      }
+    }
+
+    function enableButtons(enable) {
+      const buttons = [listenBtn, speakBtn, speakLongBtn, stopSpeakBtn, 
+                      highlightBtn, focusBtn, clearHighlightBtn, bargeInTestBtn, confirmationBtn];
+      buttons.forEach(btn => btn.disabled = !enable);
+    }
+
+    // Initialize
+    updateStatus(false);
+    enableButtons(false);
+  </script>
+</body>
+</html>

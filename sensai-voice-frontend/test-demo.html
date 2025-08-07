@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensai Voice System Demo</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .input-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .voice-output { margin-top: 20px; padding: 10px; border: 1px dashed #007bff; background-color: #e7f0ff; }
+        .voice-highlight {
+          background-color: #ffeb3b !important;
+          box-shadow: 0 0 10px rgba(255, 235, 59, 0.5) !important;
+          transition: all 0.3s ease !important;
+        }
+        .voice-highlight-focus {
+          background-color: #4caf50 !important;
+          box-shadow: 0 0 15px rgba(76, 175, 80, 0.6) !important;
+        }
+        .voice-highlight-warning {
+          background-color: #ff9800 !important;
+          box-shadow: 0 0 15px rgba(255, 152, 0, 0.6) !important;
+        }
+        .status-message {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .status-message.info { color: #007bff; }
+        .status-message.success { color: #28a745; }
+        .status-message.error { color: #dc3545; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sensai Voice System Demo</h1>
+        <p>Click "Start Voice System" and try saying things like "create account" or "join a course".</p>
+        <button id="startVoiceBtn">Start Voice System</button>
+        <button id="stopVoiceBtn" disabled>Stop Voice System</button>
+
+        <div class="voice-output">
+            <strong>Agent:</strong> <span id="agentOutput"></span>
+        </div>
+        <div class="status-message" id="systemStatus"></div>
+
+        <h2>Simulated UI Elements</h2>
+        <p>These elements have IDs that the voice system can highlight during interactions.</p>
+
+        <div class="input-group">
+            <label for="full-name-input">Full Name:</label>
+            <input type="text" id="full-name-input" placeholder="e.g., John Doe">
+        </div>
+
+        <div class="input-group">
+            <label for="email-input">Email Address:</label>
+            <input type="email" id="email-input" placeholder="e.g., john.doe@example.com">
+        </div>
+
+        <div class="input-group">
+            <label for="password-input">Password:</label>
+            <input type="password" id="password-input" placeholder="e.g., *******">
+        </div>
+
+        <button id="sign-up-button">Sign Up</button>
+
+        <hr>
+
+        <div class="input-group">
+            <label for="course-search-input">Course Name:</label>
+            <input type="text" id="course-search-input" placeholder="e.g., Introduction to AI">
+        </div>
+
+        <button id="join-course-button">Join Course</button>
+
+        <hr>
+
+        <div class="input-group">
+            <label for="task-description-input">Task Description (Offline):</label>
+            <input type="text" id="task-description-input" placeholder="e.g., Buy groceries">
+        </div>
+
+        <button id="submit-button">Submit Task</button>
+    </div>
+
+    <script type="module">
+        import { VoiceSystem } from './voice-system/index.js';
+
+        const startVoiceBtn = document.getElementById('startVoiceBtn');
+        const stopVoiceBtn = document.getElementById('stopVoiceBtn');
+        const agentOutput = document.getElementById('agentOutput');
+        const systemStatus = document.getElementById('systemStatus');
+
+        const voiceSystem = new VoiceSystem();
+
+        voiceSystem.voiceOutput.onStart(() => {
+            systemStatus.textContent = 'Agent Speaking...';
+            systemStatus.className = 'status-message info';
+        });
+
+        voiceSystem.voiceOutput.onEnd(() => {
+            systemStatus.textContent = 'Ready for your command.';
+            systemStatus.className = 'status-message';
+        });
+
+        startVoiceBtn.addEventListener('click', async () => {
+            await voiceSystem.start();
+            voiceSystem.listenForInput((transcript) => {
+                console.log('Transcription received:', transcript);
+                // The actual agent output and status updates are handled by VoiceSystem internally
+            });
+            startVoiceBtn.disabled = true;
+            stopVoiceBtn.disabled = false;
+            systemStatus.textContent = 'Voice System Started. Ready for your command.';
+            systemStatus.className = 'status-message';
+        });
+
+        stopVoiceBtn.addEventListener('click', () => {
+            voiceSystem.stop();
+            startVoiceBtn.disabled = false;
+            stopVoiceBtn.disabled = true;
+            systemStatus.textContent = 'Voice System Stopped.';
+            systemStatus.className = 'status-message';
+        });
+
+        // Add a general listener for speakAndHighlight calls to update agent output
+        // This is a simplified way to show what the agent is saying in the demo UI
+        // In a real app, VoiceOutput's onStart and onEnd could be used directly
+        const originalSpeakAndHighlight = voiceSystem.speakAndHighlight;
+        voiceSystem.speakAndHighlight = function(text, selector = null, highlightType = 'default') {
+            agentOutput.textContent = text;
+            originalSpeakAndHighlight.apply(this, arguments);
+        };
+
+        // You might want to periodically process the offline queue
+        setInterval(() => {
+            voiceSystem.processPendingOfflineSubmissions();
+        }, 60000); // Every minute
+    </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Input Demo - Web Speech API</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    #listening {
+      color: green;
+      font-weight: bold;
+      display: none;
+    }
+    #transcript {
+      margin-top: 1em;
+      font-size: 1.2em;
+      color: #333;
+      min-height: 50px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #interim {
+      color: #666;
+      font-style: italic;
+    }
+    #error {
+      color: red;
+      display: none;
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Voice Input Demo - Web Speech API</h1>
+  <p>This demo uses the browser's built-in speech recognition (no API keys needed!)</p>
+  
+  <button id="recordBtn">Start Recording</button>
+  <span id="listening">Listening...</span>
+  
+  <div id="transcript">
+    <div>Your transcript will appear here...</div>
+    <div id="interim"></div>
+  </div>
+  
+  <div id="error"></div>
+
+  <script type="module">
+    import { WebSpeechRecognition } from './index.js';
+    
+    const btn = document.getElementById('recordBtn');
+    const listening = document.getElementById('listening');
+    const transcriptDiv = document.getElementById('transcript');
+    const interimDiv = document.getElementById('interim');
+    const errorDiv = document.getElementById('error');
+    let isRecording = false;
+
+    try {
+      const recognition = new WebSpeechRecognition();
+      
+      recognition.onResult((text, isFinal) => {
+        if (isFinal) {
+          // Final result
+          transcriptDiv.innerHTML = `<div><strong>Final:</strong> ${text}</div>`;
+          interimDiv.textContent = '';
+        } else {
+          // Interim result
+          interimDiv.textContent = `Interim: ${text}`;
+        }
+      });
+
+      recognition.onError((error) => {
+        errorDiv.textContent = `Error: ${error}`;
+        errorDiv.style.display = 'block';
+        btn.textContent = 'Start Recording';
+        isRecording = false;
+        listening.style.display = 'none';
+      });
+
+      btn.onclick = () => {
+        errorDiv.style.display = 'none';
+        
+        if (!isRecording) {
+          recognition.startListening();
+          btn.textContent = 'Stop Recording';
+          isRecording = true;
+          listening.style.display = 'inline';
+          transcriptDiv.innerHTML = '<div>Listening...</div>';
+          interimDiv.textContent = '';
+        } else {
+          recognition.stopListening();
+          btn.textContent = 'Start Recording';
+          isRecording = false;
+          listening.style.display = 'none';
+        }
+      };
+
+    } catch (error) {
+      errorDiv.textContent = `Speech recognition not supported: ${error.message}`;
+      errorDiv.style.display = 'block';
+      btn.disabled = true;
+    }
+  </script>
+</body>
+</html>
