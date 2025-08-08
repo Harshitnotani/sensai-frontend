@@ -133,30 +133,32 @@ export class WebSpeechRecognition {
   }
 }
 
-import { API_ENDPOINTS } from '../utils/api.js';
-// Legacy function for compatibility (now uses Web Speech API)
+
 export async function transcribeWithWhisper(audioBlob) {
-  console.log('Frontend - transcribeWithWhisper: Sending audio to backend.', audioBlob);
-  try {
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-
-    const response = await fetch(API_ENDPOINTS.transcribe, {
-      method: 'POST',
-      body: formData,
+  // This function is kept for compatibility but now uses Web Speech API
+  // In a real implementation, you might want to use a different approach
+  return new Promise((resolve) => {
+    const recognition = new WebSpeechRecognition();
+    let transcript = '';
+    
+    recognition.onResult((text, isFinal) => {
+      transcript = text;
+      if (isFinal) {
+        resolve(transcript);
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Frontend - transcribeWithWhisper: HTTP error response:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Frontend - transcribeWithWhisper: Received transcription from backend:', data);
-    return data.text;
-  } catch (error) {
-    console.error('Frontend - transcribeWithWhisper: Error transcribing audio with Whisper backend:', error);
-    return null;
-  }
+    
+    recognition.onError((error) => {
+      console.error('Speech recognition error:', error);
+      resolve(null);
+    });
+    
+    recognition.startListening();
+    
+    // Stop after 10 seconds if no final result
+    setTimeout(() => {
+      recognition.stopListening();
+      resolve(transcript);
+    }, 10000);
+  });
 }

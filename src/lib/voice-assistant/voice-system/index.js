@@ -4,7 +4,7 @@ import { BargeInController } from '../barge-in-controller/index.js';
 import { UIHighlightController } from '../ui-highlight-controller/index.js';
 import { UserConfirmationHandler } from '../user-confirmation-handler/index.js';
 import { getOfflineSubmissionQueue, processOfflineSubmissionQueue } from '../utils/api.js';
-import { VoiceInput, transcribeWithWhisper } from '../voice-input/index.js';
+import { VoiceInput, WebSpeechRecognition, transcribeWithWhisper } from '../voice-input/index.js';
 import { VoiceOutput } from '../voice-output/index.js';
 import { DialogManager } from './dialog-manager.js';
 
@@ -12,6 +12,7 @@ export class VoiceSystem {
   constructor() {
     // Initialize all modules
     this.voiceInput = new VoiceInput();
+    this.webSpeechRecognition = new WebSpeechRecognition(); // New: Initialize WebSpeechRecognition
     this.voiceOutput = new VoiceOutput();
     this.uiHighlight = new UIHighlightController();
     this.bargeIn = new BargeInController(this.voiceInput, this.voiceOutput, transcribeWithWhisper);
@@ -32,7 +33,7 @@ export class VoiceSystem {
     this.isActive = false;
     this.currentStep = null;
 
-    // Bind transcribeWithWhisper to VoiceSystem instance for easier access
+    // Bind transcribeWithWhisper to VoiceSystem instance for easier access (no longer needed here, but keeping for now)
     this.transcribeWithWhisper = transcribeWithWhisper;
   }
 
@@ -50,6 +51,7 @@ export class VoiceSystem {
     this.voiceOutput.stop();
     this.bargeIn.stopListeningForBargeIn();
     this.confirmation.stopWaitingForConfirmation();
+    this.webSpeechRecognition.stopListening(); // Stop WebSpeechRecognition as well
     console.log('Voice system stopped');
   }
 
@@ -79,91 +81,31 @@ export class VoiceSystem {
 
   // Listen for user input
   listenForInput(callback) {
-    this.voiceInput.onData(async (audioBlob) => {
+    this.webSpeechRecognition.onResult((text, isFinal) => {
       if (this.isActive) {
-        console.log('Audio captured, transcribing...');
-        const transcript = await this.transcribeWithWhisper(audioBlob);
-
-        if (transcript) {
-          console.log('User said:', transcript);
-          const nextStep = this.dialogManager.handleInput(transcript);
-
-          if (nextStep) {
-            this.speakAndHighlight(nextStep.prompt, nextStep.uiHighlight);
-            if (nextStep.expectedInputType === 'confirmation') {
-              this.askForConfirmation(nextStep.prompt, async (confirmed) => {
-                if (confirmed) {
-                  console.log('User confirmed.');
-                  const currentAction = this.dialogManager.getCurrentStep().action;
-                  const actionResult = await this.dialogManager.performAction(currentAction);
-                  if (actionResult.success) {
-                    const afterConfirmationStep = this.dialogManager.nextStep();
-                    if (afterConfirmationStep) {
-                      this.speakAndHighlight(afterConfirmationStep.prompt, afterConfirmationStep.uiHighlight);
-                    } else {
-                      console.log('Journey completed.');
-                      this.speakAndHighlight("Great! Your request has been processed.");
-                      this.dialogManager.reset();
-                    }
-                  } else if (actionResult.queued) {
-                    // If action was queued for offline submission
-                    this.speakAndHighlight("It seems you're offline or there was a temporary issue. Your request has been saved and will be processed when you're back online.", null, 'info');
-                    this.dialogManager.reset();
-                  } else {
-                    console.error('Action failed:', actionResult.error);
-                    this.speakAndHighlight("I'm sorry, there was an error processing your request. Please try again.");
-                    this.dialogManager.reset();
-                  }
-                } else {
-                  console.log('User denied or provided other response.');
-                  this.dialogManager.reset();
-                  this.speakAndHighlight("Okay, let's try again. What can I help you with?");
-                }
-              });
-            } else {
-              // If it's a data collection step, perform the action immediately after collecting data
-              const currentAction = this.dialogManager.getCurrentStep().action;
-              const actionResult = await this.dialogManager.performAction(currentAction);
-              if (!actionResult.success) {
-                console.error('Action failed:', actionResult.error);
-                this.speakAndHighlight("I'm sorry, there was an error processing your input. Please try again.");
-                this.dialogManager.reset();
-              }
-            }
-          } else {
-            // If nextStep is null, it means either intent not recognized or journey completed.
-            // If handleInput returns null due to an action failure in a data collection step
-            if (nextStep === null && this.dialogManager.currentJourney) {
-              this.speakAndHighlight("I'm sorry, I couldn't process that input. Can you please try again?");
-              this.dialogManager.reset(); // Reset the journey on action failure
-            } else if (this.dialogManager.currentJourney) {
-              const finalActionStep = this.dialogManager.getCurrentStep(); // Get the last step's action
-              if (finalActionStep && finalActionStep.action && finalActionStep.expectedInputType !== 'confirmation') { // Ensure not a confirmation step action
-                const actionResult = await this.dialogManager.performAction(finalActionStep.action);
-                if (actionResult.success) {
-                  this.speakAndHighlight("Great! Your request has been processed.");
-                } else if (actionResult.queued) {
-                  this.speakAndHighlight("It seems you're offline or there was a temporary issue. Your request has been saved and will be processed when you're back online.", null, 'info');
-                } else {
-                  console.error('Final action failed:', actionResult.error);
-                  this.speakAndHighlight("I'm sorry, there was an error completing your request. Please try again.");
-                }
-              }
-              console.log('Journey completed.');
-              this.dialogManager.reset();
-            } else {
-              this.speakAndHighlight("I'm not sure how to help with that. Can you please rephrase?");
-            }
-          }
-          callback(transcript);
-        } else {
-          console.error('Transcription failed.');
-          this.speakAndHighlight("Sorry, I couldn't understand that. Can you please try again?");
-        }
+        console.log('Frontend - Received from WebSpeechRecognition:', { text, isFinal });
+        // The callback from page.tsx expects (text: string, isFinal: boolean)
+        callback(text, isFinal); // Pass results directly to page.tsx
       }
     });
     
-    this.voiceInput.startRecording(); // Start recording when listenForInput is called
+    this.webSpeechRecognition.onError((event) => {
+      console.error('WebSpeechRecognition Error:', event.error);
+      if (event.error === 'no-speech') {
+        this.speakAndHighlight("I didn't detect any speech. Please try again.");
+      } else if (event.error === 'not-allowed') {
+        this.speakAndHighlight("Microphone access was denied. Please allow microphone access in your browser settings.");
+      } else {
+        this.speakAndHighlight("An error occurred with speech recognition. Please try again.");
+      }
+      // Only reset dialog manager if an error implies the conversation flow broke
+      // For 'no-speech', we might want to stay in active listening mode or offer to continue
+      // For now, reset for all errors to ensure a clean state.
+      this.dialogManager.reset();
+      callback('', true); // Indicate error to UI, clear interim
+    });
+
+    this.webSpeechRecognition.startListening(); // Start listening when listenForInput is called
   }
 
   // Ask for confirmation

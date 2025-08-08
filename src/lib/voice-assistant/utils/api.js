@@ -3,7 +3,6 @@ export const API_ENDPOINTS = {
   joinCourse: 'http://localhost:8002/join-course',
   submitOffline: 'http://localhost:8002/submit-offline',
   recognizeIntent: 'http://localhost:8002/recognize-intent',
-  transcribe: 'http://localhost:8002/transcribe',
 };
 
 export async function signUp(userData) {

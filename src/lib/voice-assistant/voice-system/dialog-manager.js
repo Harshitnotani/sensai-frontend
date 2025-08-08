@@ -1,5 +1,5 @@
 import { logEvent, logJourneyEnd, logJourneyStart } from '../utils/analytics.js';
-import { addToOfflineSubmissionQueue, API_ENDPOINTS, joinCourse, signUp, submitOfflineTask } from '../utils/api.js';
+import { addToOfflineSubmissionQueue, joinCourse, signUp, submitOfflineTask } from '../utils/api.js';
 import { DIALOG_FLOWS, INTENT_MAPPING } from './dialog-config.js';
 
 export class DialogManager {
@@ -20,42 +20,15 @@ export class DialogManager {
 
   // Recognize user intent using GPT-based model (via backend API)
   async recognizeIntent(transcript) {
-    try {
-      const response = await fetch(API_ENDPOINTS.recognizeIntent, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: transcript }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    const lowerTranscript = transcript.toLowerCase();
+    for (const phrase in INTENT_MAPPING) {
+      if (lowerTranscript.includes(phrase)) {
+        logEvent('intent_recognized_fallback', { transcript, intent: INTENT_MAPPING[phrase] });
+        return INTENT_MAPPING[phrase];
       }
-
-      const data = await response.json();
-      const intent = data.intent;
-
-      if (intent && intent !== 'none') {
-        logEvent('intent_recognized', { transcript, intent });
-        return intent;
-      } else {
-        logEvent('intent_not_recognized', { transcript });
-        return null;
-      }
-    } catch (error) {
-      console.error('Error recognizing intent via API:', error);
-      logEvent('intent_recognition_api_failure', { transcript, error: error.message });
-      // Fallback to simple keyword matching if API fails
-      const lowerTranscript = transcript.toLowerCase();
-      for (const phrase in INTENT_MAPPING) {
-        if (lowerTranscript.includes(phrase)) {
-          logEvent('intent_recognized_fallback', { transcript, intent: INTENT_MAPPING[phrase] });
-          return INTENT_MAPPING[phrase];
-        }
-      }
-      return null;
     }
+    logEvent('intent_not_recognized', { transcript });
+    return null;
   }
 
   startJourney(intent) {

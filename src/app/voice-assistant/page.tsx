@@ -66,11 +66,50 @@ export default function VoiceAssistantPage() {
     if (voiceSystemRef.current && hasMicPermission) {
       setTranscript('Listening...');
       setInterimTranscript('');
-      voiceSystemRef.current.listenForInput((text: string, isFinal: boolean) => {
+      voiceSystemRef.current.listenForInput(async (text: string, isFinal: boolean) => {
         console.log('Frontend - Received from listenForInput:', { text, isFinal });
         if (isFinal) {
           setTranscript(`You said: ${text}`);
-          setInterimTranscript('');
+          setInterimTranscript(''); // Clear interim once final is received
+
+          if (text) {
+            console.log('User said:', text);
+            const dialogResult = await voiceSystemRef.current.dialogManager.handleInput(text); // Await the async call
+
+            if (dialogResult) {
+              // If handleInput returned a next step, speak and highlight
+              voiceSystemRef.current.speakAndHighlight(dialogResult.prompt, dialogResult.uiHighlight);
+            } else {
+              // If handleInput returned null, it means no intent was recognized or action failed
+              // Check if a journey is still active or if it was reset
+              if (voiceSystemRef.current.dialogManager.currentJourney) {
+                // A journey was active, but something went wrong (e.g., action failed).
+                const currentStep = voiceSystemRef.current.dialogManager.getCurrentStep();
+                if (currentStep && currentStep.action) {
+                  const actionResult = await voiceSystemRef.current.dialogManager.performAction(currentStep.action);
+                  if (actionResult.success) {
+                    voiceSystemRef.current.speakAndHighlight("Great! Your request has been processed.");
+                  } else if (actionResult.queued) {
+                    voiceSystemRef.current.speakAndHighlight("It seems you're offline or there was a temporary issue. Your request has been saved and will be processed when you're back online.", null, 'info');
+                  } else {
+                    console.error('Action failed:', actionResult.error);
+                    voiceSystemRef.current.speakAndHighlight("I'm sorry, there was an error completing your request. Please try again.");
+                  }
+                } else {
+                  // Unexpected state: journey active but no valid step/action
+                  console.warn('DialogManager is in an unexpected state: currentJourney active but no valid currentStep/action.');
+                  voiceSystemRef.current.speakAndHighlight("I'm sorry, I've encountered an unexpected issue with our conversation flow. Could you please try again?");
+                }
+                voiceSystemRef.current.dialogManager.reset(); // Reset after failure/completion
+              } else {
+                // No active journey and no intent recognized
+                voiceSystemRef.current.speakAndHighlight("I'm not sure how to help with that. Can you please rephrase?");
+              }
+            }
+          } else {
+            // Transcription was empty, indicate to user
+            voiceSystemRef.current.speakAndHighlight("Sorry, I couldn't understand that. Can you please try again?");
+          }
         } else {
           setInterimTranscript(text);
         }
@@ -84,7 +123,7 @@ export default function VoiceAssistantPage() {
     if (voiceSystemRef.current && voiceSystemRef.current.voiceInput) {
       voiceSystemRef.current.voiceInput.stopRecording();
       // Capture the current interim transcript as final when stopping manually
-      setTranscript(`You said: ${interimTranscript}`);
+      setTranscript(`Stoped Listening ${interimTranscript}`);
       setInterimTranscript('');
     }
   };
