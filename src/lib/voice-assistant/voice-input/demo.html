@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Input Demo</title>
+  <style>
+    #listening {
+      color: green;
+      font-weight: bold;
+      display: none;
+    }
+    #transcript {
+      margin-top: 1em;
+      font-size: 1.2em;
+      color: #333;
+    }
+    #loading {
+      color: orange;
+      display: none;
+    }
+    #error {
+      color: red;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Voice Input Demo</h1>
+  <button id="recordBtn">Start Recording</button>
+  <span id="listening">Listening...</span>
+  <span id="loading">Transcribing...</span>
+  <div id="error"></div>
+  <div id="transcript"></div>
+  <script type="module">
+    import { VoiceInput, transcribeWithWhisper } from './index.js';
+    const voiceInput = new VoiceInput();
+    const btn = document.getElementById('recordBtn');
+    const listening = document.getElementById('listening');
+    const transcriptDiv = document.getElementById('transcript');
+    const loading = document.getElementById('loading');
+    const errorDiv = document.getElementById('error');
+    let isRecording = false;
+
+    btn.onclick = async () => {
+      errorDiv.style.display = 'none';
+      transcriptDiv.textContent = '';
+      if (!isRecording) {
+        const ok = await voiceInput.requestMicPermission();
+        if (!ok) return;
+        voiceInput.startRecording();
+        btn.textContent = 'Stop Recording';
+        isRecording = true;
+      } else {
+        voiceInput.stopRecording();
+        btn.textContent = 'Start Recording';
+        isRecording = false;
+      }
+    };
+
+    voiceInput.onState((state) => {
+      listening.style.display = state === 'listening' ? 'inline' : 'none';
+    });
+
+    voiceInput.onData(async (audioBlob) => {
+      loading.style.display = 'inline';
+      transcriptDiv.textContent = '';
+      errorDiv.style.display = 'none';
+      
+      const transcript = await transcribeWithWhisper(audioBlob);
+      loading.style.display = 'none';
+      
+      if (transcript) {
+        transcriptDiv.textContent = transcript;
+      } else {
+        errorDiv.textContent = 'Transcription failed. Please check that the backend is running on localhost:8002.';
+        errorDiv.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
